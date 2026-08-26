@@ -10,6 +10,7 @@ builder.Services.AddDbContext<AppDbContext>(o =>
 builder.Services.AddDataProtection().PersistKeysToDbContext<AppDbContext>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SystemStatusProvider>();
+builder.Services.AddSingleton<ThreeXUiMonitorProvider>();
 builder.Services.AddSingleton<MarketDataProvider>();
 builder.Services.AddSingleton<CustomJsonDataProvider>();
 builder.Services.AddSingleton<PanelRenderer>();

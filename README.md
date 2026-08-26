@@ -2,13 +2,14 @@
 
 基于 **.NET 10 + Vue 3** 的 AirPage 墨水屏快照管理与定时推送系统。系统采集行情、服务器状态或自定义 HTTP JSON 数据，生成适合 528×792 四级灰度屏的 PNG 预览和固件兼容 2-bit BMP，并推送到 AirPage。
 
-当前版本：**v0.0.2**。可在 [Releases](https://github.com/sunkejava/AirPageSystem/releases) 下载 Windows、Linux、macOS 自包含版本，无需预装 .NET。
+当前版本：**v0.0.3**。可在 [Releases](https://github.com/sunkejava/AirPageSystem/releases) 下载 Windows、Linux、macOS 自包含版本，无需预装 .NET。
 
 ## 功能
 
 - Vue 管理端：总览、模板、数据源、定时任务、设备和推送历史。
 - **最新行情面板**：三大指数、上涨/下跌/平盘、涨跌停及异动股票。
 - **服务端状态面板**：系统信息、应用内存、磁盘、运行时间、网络流量和高内存进程。
+- **3xui代理监控**：3x-ui/Xray 运行状态与版本、上传下载、入站、客户端、IP、连接数及高流量入站。
 - 自定义面板：绑定 GET/POST JSON 数据源，通过声明式路径配置标题、指标和列表。
 - 标准五段 Cron、独立时区、任务启停和执行结果。
 - AirPage 设备 ID 使用 ASP.NET Core Data Protection 加密存储；接口和日志不回显凭据。
@@ -24,8 +25,32 @@ docker compose up -d --build
 也可直接使用多架构镜像：
 
 ~~~bash
-docker run -d --name airpage-system -p 5088:8080 -v airpage-data:/app/data ghcr.io/sunkejava/airpagesystem:0.0.2
+docker run -d --name airpage-system -p 5088:8080 -v airpage-data:/app/data ghcr.io/sunkejava/airpagesystem:0.0.3
 ~~~
+
+## 3x-ui 监控配置
+
+直接运行在 3x-ui 主机时，程序会自动查找 `/etc/x-ui/x-ui.db` 等常见路径。也可以通过配置指定：
+
+~~~json
+"ThreeXUi": {
+  "DatabasePath": "/etc/x-ui/x-ui.db",
+  "PanelVersion": "",
+  "XrayVersion": ""
+}
+~~~
+
+Docker 部署需要把宿主机数据库以只读方式挂载进容器：
+
+~~~yaml
+volumes:
+  - ./data:/app/data
+  - /etc/x-ui/x-ui.db:/host/3x-ui/x-ui.db:ro
+environment:
+  ThreeXUi__DatabasePath: /host/3x-ui/x-ui.db
+~~~
+
+数据库仅以 SQLite 只读模式打开。面板不会读取或显示 UUID、密码、订阅 ID；容器只能看到容器内进程，因此 Docker 部署时 3x-ui/Xray 进程状态可能显示“停止”，流量及入站数据不受影响。原生部署可以同时获得进程状态和数据库数据。
 
 浏览器访问 http://localhost:5088：
 

@@ -19,14 +19,14 @@ public sealed class PanelRenderer(IConfiguration config)
     private static string ResolveFontPath(IConfiguration config)
     {
         var configured = config["Panel:FontPath"];
-        if (!string.IsNullOrWhiteSpace(configured)) return configured;
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured)) return configured;
         var bundled = Path.Combine(AppContext.BaseDirectory, "fonts", "NotoSansCJK-Regular.ttc");
         return File.Exists(bundled) ? bundled : "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
     }
 
     public RenderedPanel RenderMarket(MarketSnapshot m) => Render(canvas =>
     {
-        Header(canvas, "A股盘中快照", m.CollectedAt);
+        Header(canvas, "A股盘中快照", m.CollectedAt, "盘中快照");
         Text(canvas, "主要指数", 18, 96, 24, true);
         for (var i = 0; i < Math.Min(3, m.Indices.Count); i++)
         {
@@ -80,6 +80,34 @@ public sealed class PanelRenderer(IConfiguration config)
         Footer(canvas, "系统状态实时采集｜网络增量按采集周期统计", $"应用托管内存 {Bytes(s.ManagedMemoryBytes)}");
     });
 
+    public RenderedPanel RenderThreeXUi(ThreeXUiSnapshot s) => Render(canvas =>
+    {
+        Header(canvas, "3x-ui 代理监控", s.CollectedAt, "实时快照");
+        var state = $"面板 {(s.PanelRunning ? "运行" : "停止")}   Xray {(s.XrayRunning ? "运行" : "停止")}";
+        Text(canvas, state, 18, 98, 24, true);
+        Text(canvas, $"3x-ui {s.PanelVersion}   Xray {s.XrayVersion}", 18, 132, 15);
+        Metric(canvas, 18, 170, "总用量", Bytes(s.UpBytes + s.DownBytes), $"运行 {Duration(s.Uptime)}");
+        Metric(canvas, 184, 170, "入站", $"{s.EnabledInboundCount}/{s.InboundCount}", "启用/全部");
+        Metric(canvas, 350, 170, "客户端", s.ClientCount.ToString(), $"IP {s.ClientIpCount}");
+        Text(canvas, "流量与连接", 18, 270, 24, true);
+        Text(canvas, $"上传 {Bytes(s.UpBytes)}    下载 {Bytes(s.DownBytes)}", 24, 310, 19);
+        Text(canvas, $"TCP连接 {s.TcpConnections}    UDP监听 {s.UdpListeners}", 24, 344, 18);
+        Text(canvas, $"主机IP {Trim(string.Join(" / ", s.Addresses.DefaultIfEmpty("未获取")), 38)}", 24, 376, 17);
+        Text(canvas, "高流量入站", 18, 416, 24, true);
+        Text(canvas, "状态  名称/协议          端口      上传      下载", 18, 456, 15);
+        for (var i = 0; i < Math.Min(6, s.Inbounds.Count); i++)
+        {
+            var item = s.Inbounds[i]; var y = 488 + i * 35;
+            if (i % 2 == 0) canvas.Mutate(c => c.Fill(Color.ParseHex("EEEEEE"), new Rectangle(14, y - 3, 500, 31)));
+            Text(canvas, item.Enabled ? "●" : "○", 20, y, 15);
+            Text(canvas, Trim($"{item.Remark}/{item.Protocol}", 17), 52, y, 15);
+            Text(canvas, item.Port.ToString(), 260, y, 15);
+            Text(canvas, Bytes(item.UpBytes), 328, y, 15);
+            Text(canvas, Bytes(item.DownBytes), 425, y, 15);
+        }
+        Footer(canvas, $"只读采集｜{s.Status}", "不读取UUID、密码或订阅凭据");
+    });
+
     public RenderedPanel RenderCustom(string title, IReadOnlyDictionary<string, string> metrics,
         IReadOnlyList<IReadOnlyDictionary<string, string>> rows, DateTimeOffset collectedAt) => Render(canvas =>
     {
@@ -115,11 +143,11 @@ public sealed class PanelRenderer(IConfiguration config)
         if (string.IsNullOrWhiteSpace(family.Name)) family = families.First();
         return family.CreateFont(size, style);
     }
-    private void Header(Image<L8> c, string title, DateTimeOffset at)
+    private void Header(Image<L8> c, string title, DateTimeOffset at, string snapshot = "状态快照")
     {
         c.Mutate(x => x.Fill(Color.Black, new Rectangle(0, 0, _width, 82)));
         Text(c, title, 18, 10, 34, true, Color.White);
-        Text(c, $"{at:yyyy-MM-dd HH:mm:ss} 北京时间｜盘中快照", 18, 56, 14, false, Color.ParseHex("DDDDDD"));
+        Text(c, $"{at:yyyy-MM-dd HH:mm:ss} 北京时间｜{snapshot}", 18, 56, 14, false, Color.ParseHex("DDDDDD"));
     }
     private void Footer(Image<L8> c, string first, string second)
     {
@@ -150,6 +178,7 @@ public sealed class PanelRenderer(IConfiguration config)
         >= 1L << 10 => $"{bytes / (double)(1L << 10):0.0} KB",
         _ => $"{bytes} B"
     };
+    private static string Duration(TimeSpan value) => value == TimeSpan.Zero ? "未知" : value.TotalDays >= 1 ? $"{(int)value.TotalDays}天{value.Hours}时" : $"{(int)value.TotalHours}时{value.Minutes}分";
     private static byte[] Encode2BitBmp(Image<L8> image)
     {
         var width = image.Width; var height = image.Height; var rowBytes = ((width * 2 + 31) / 32) * 4;

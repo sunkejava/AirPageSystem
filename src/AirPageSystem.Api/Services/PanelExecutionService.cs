@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AirPageSystem.Api.Services;
 
 public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider market, SystemStatusProvider system,
-    CustomJsonDataProvider custom, PanelRenderer renderer, AirPageClient airPage, IWebHostEnvironment environment,
+    ThreeXUiMonitorProvider threeXUi, CustomJsonDataProvider custom, PanelRenderer renderer, AirPageClient airPage, IWebHostEnvironment environment,
     IConfiguration configuration)
 {
     public async Task<ExecutionResult> ExecuteAsync(Guid templateId, Guid? deviceId, bool push, CancellationToken ct)
@@ -18,6 +18,7 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
         {
             "market" => renderer.RenderMarket(await market.GetAsync(ct)),
             "server-status" => renderer.RenderSystem(await system.GetAsync(ct)),
+            "3xui-monitor" => renderer.RenderThreeXUi(await threeXUi.GetAsync(ct)),
             "custom" => await RenderCustomAsync(template, ct),
             _ => throw new InvalidOperationException($"不支持的模板类型：{template.Type}")
         };

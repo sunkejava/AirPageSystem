@@ -11,8 +11,8 @@ permissions:
   packages: write
 
 env:
-  VERSION: 0.0.2
-  TAG: v0.0.2
+  VERSION: 0.0.3
+  TAG: v0.0.3
 
 jobs:
   release:
@@ -68,7 +68,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/airpagesystem:0.0.2
+            ghcr.io/${{ github.repository_owner }}/airpagesystem:0.0.3
             ghcr.io/${{ github.repository_owner }}/airpagesystem:latest
       - name: Create GitHub Release
         env:
