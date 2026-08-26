@@ -1,6 +1,6 @@
 # AirPageSystem
 
-Current release: **v0.0.5**. Self-contained Windows, Linux and macOS packages that do not require a preinstalled .NET runtime are available from [Releases](https://github.com/sunkejava/AirPageSystem/releases).
+Current release: **v0.0.6**. Self-contained Windows, Linux and macOS packages that do not require a preinstalled .NET runtime are available from [Releases](https://github.com/sunkejava/AirPageSystem/releases).
 
 The built-in **3x-ui Proxy Monitor** panel reads a local 3x-ui SQLite database in read-only mode and displays 3x-ui/Xray process state, versions, uptime, upload/download totals, inbound/client/IP counts, active connections, host addresses, and high-traffic inbounds. Set `ThreeXUi__DatabasePath` when the database is not in a standard location. Docker users should mount `/etc/x-ui/x-ui.db` read-only into the container.
 

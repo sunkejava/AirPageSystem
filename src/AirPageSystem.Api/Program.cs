@@ -49,5 +49,8 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapFallbackToFile("index.html");
+app.MapGet("/api/version", () => Results.Ok(new { version })).AllowAnonymous();
+// Vue routes are client-side routes. The fallback must remain public so a direct
+// navigation or browser refresh can load the login shell before authentication.
+app.MapFallbackToFile("index.html").AllowAnonymous();
 app.Run();

@@ -1,9 +1,15 @@
 async function request(path,options={}){
  const response=await fetch('/api'+path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options})
- if(!response.ok)throw new Error(await response.text()||('HTTP '+response.status))
+ if(!response.ok){
+  const raw=await response.text();let message=raw
+  try{const body=JSON.parse(raw);message=body.detail||body.title||Object.values(body.errors||{}).flat().join('；')||raw}catch{}
+  if(response.status===401&&!['/auth/me','/auth/login'].includes(path))window.dispatchEvent(new CustomEvent('airpage:auth-expired'))
+  const error=new Error(message||('HTTP '+response.status));error.status=response.status;throw error
+ }
  return response.status===204?null:response.json()
 }
 export const api={
+ version:()=>request('/version'),
  login:body=>request('/auth/login',{method:'POST',body:JSON.stringify(body)}),me:()=>request('/auth/me'),logout:()=>request('/auth/logout',{method:'POST'}),changePassword:body=>request('/auth/change-password',{method:'POST',body:JSON.stringify(body)}),
  dashboard:()=>request('/dashboard'),templates:()=>request('/templates'),devices:()=>request('/devices'),
  schedules:()=>request('/schedules'),sources:()=>request('/data-sources'),history:()=>request('/history'),
