@@ -1,0 +1,15 @@
+services:
+  airpage-system:
+    build: .
+    container_name: airpage-system
+    restart: unless-stopped
+    ports:
+      - "5088:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      TZ: Asia/Shanghai
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Data Source=/app/data/airpage.db
+      Panel__OutputDirectory: /app/data/renders
+      Panel__FontPath: /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
