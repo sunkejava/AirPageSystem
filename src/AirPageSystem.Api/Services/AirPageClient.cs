@@ -8,7 +8,7 @@ namespace AirPageSystem.Api.Services;
 public sealed class AirPageClient(IHttpClientFactory clients, IDataProtectionProvider protection, ILogger<AirPageClient> logger)
 {
     private readonly IDataProtector _protector = protection.CreateProtector("AirPageSystem.DeviceId.v1");
-    private static readonly HashSet<string> TrustedHosts(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> TrustedHosts = new(StringComparer.OrdinalIgnoreCase)
         { "airpage.crossmux.cn", "airpage.crossmux.com", "airpage.yunhug.com" };
 
     public (AirPageDevice Device, string DeviceId) ParseAndProtect(string name, string rawUrl, bool isDefault)
@@ -58,4 +58,3 @@ public sealed class AirPageClient(IHttpClientFactory clients, IDataProtectionPro
     }
 }
 public sealed record PushResult(bool Succeeded, bool Refreshed, string Message);
-
