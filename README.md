@@ -2,6 +2,8 @@
 
 基于 **.NET 10 + Vue 3** 的 AirPage 墨水屏快照管理与定时推送系统。系统采集行情、服务器状态或自定义 HTTP JSON 数据，生成适合 528×792 四级灰度屏的 PNG 预览和固件兼容 2-bit BMP，并推送到 AirPage。
 
+当前版本：**v0.0.1**。可在 [Releases](https://github.com/sunkejava/AirPageSystem/releases) 下载 Windows、Linux、macOS 自包含版本，无需预装 .NET。
+
 ## 功能
 
 - Vue 管理端：总览、模板、数据源、定时任务、设备和推送历史。
@@ -17,6 +19,12 @@
 
 ~~~bash
 docker compose up -d --build
+~~~
+
+也可直接使用多架构镜像：
+
+~~~bash
+docker run -d --name airpage-system -p 5088:8080 -v airpage-data:/app/data ghcr.io/sunkejava/airpagesystem:0.0.1
 ~~~
 
 浏览器访问 http://localhost:5088：
@@ -110,4 +118,3 @@ src/
 - 公开行情源应在生产环境增加缓存、重试、熔断和授权数据源。
 - CPU 百分比需跨采样窗口计算，当前服务状态面板优先展示稳定的内存、磁盘、流量与进程信息。
 - 首版使用 EnsureCreated 快速初始化；持续迭代时建议改为 EF Core migrations。
-

@@ -14,7 +14,15 @@ public sealed class PanelRenderer(IConfiguration config)
 {
     private readonly int _width = config.GetValue("Panel:Width", 528);
     private readonly int _height = config.GetValue("Panel:Height", 792);
-    private readonly string _fontPath = config["Panel:FontPath"] ?? "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
+    private readonly string _fontPath = ResolveFontPath(config);
+
+    private static string ResolveFontPath(IConfiguration config)
+    {
+        var configured = config["Panel:FontPath"];
+        if (!string.IsNullOrWhiteSpace(configured)) return configured;
+        var bundled = Path.Combine(AppContext.BaseDirectory, "fonts", "NotoSansCJK-Regular.ttc");
+        return File.Exists(bundled) ? bundled : "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
+    }
 
     public RenderedPanel RenderMarket(MarketSnapshot m) => Render(canvas =>
     {
