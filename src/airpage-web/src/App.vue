@@ -11,8 +11,15 @@ const forms=reactive({
  template:{name:'自定义状态面板',type:'custom',description:'',dataSourceId:'',schemaJson:'{"titlePath":"$.title","metrics":[{"label":"状态","path":"$.status"}],"itemsPath":"$.items","columns":[{"label":"名称","path":"$.name"},{"label":"值","path":"$.value"}]}'}
 })
 const defaultDevice=computed(()=>state.devices.find(x=>x.isDefault))
-async function load(){const [dashboard,templates,devices,schedules,sources,history]=await Promise.all([api.dashboard(),api.templates(),api.devices(),api.schedules(),api.sources(),api.history()]);Object.assign(state,{dashboard,templates,devices,schedules,sources,history});if(!forms.schedule.templateId&&templates[0])forms.schedule.templateId=templates[0].id;if(!forms.schedule.deviceId&&devices[0])forms.schedule.deviceId=devices[0].id}
+async function load(){
+ const keys=['dashboard','templates','devices','schedules','sources','history']
+ const results=await Promise.allSettled([api.dashboard(),api.templates(),api.devices(),api.schedules(),api.sources(),api.history()])
+ results.forEach((result,index)=>{if(result.status==='fulfilled')state[keys[index]]=result.value})
+ if(!forms.schedule.templateId&&state.templates[0])forms.schedule.templateId=state.templates[0].id
+ if(!forms.schedule.deviceId&&state.devices[0])forms.schedule.deviceId=state.devices[0].id
+}
 async function act(fn,message){busy.value=true;try{await fn();toast.value=message;await load()}catch(e){toast.value=e.message}finally{busy.value=false;setTimeout(()=>toast.value='',3500)}}
+async function addDevice(){await act(async()=>{await api.addDevice(forms.device);forms.device.deviceUrl=''},'设备已安全添加')}
 async function execute(template,push=true){await act(async()=>{const r=await api.execute({templateId:template.id,deviceId:defaultDevice.value?.id,push});preview.value=r.previewPath},push?'面板已生成并提交推送':'预览已生成')}
 onMounted(load)
 </script>
@@ -46,7 +53,7 @@ onMounted(load)
    <article class="card table-card"><table><thead><tr><th>任务</th><th>Cron</th><th>时区</th><th>下次执行</th><th>状态</th><th></th></tr></thead><tbody><tr v-for="s in state.schedules"><td>{{s.name}}</td><td><code>{{s.cron}}</code></td><td>{{s.timeZoneId}}</td><td>{{s.nextRunAt?new Date(s.nextRunAt).toLocaleString():'-'}}</td><td><span :class="['status',!s.enabled&&'off']">{{s.enabled?'运行中':'已停用'}}</span></td><td><button class="outline" @click="act(()=>api.toggleSchedule(s.id),'任务状态已更新')">切换</button></td></tr></tbody></table></article>
   </section>
   <section v-if="active==='devices'">
-   <article class="card form-card"><h2>添加 AirPage 设备</h2><p class="hint">设备链接属于凭据，后端仅加密保存设备ID，列表和日志不会回显。</p><div class="form-grid"><label>设备名称<input v-model="forms.device.name"></label><label class="wide">AirPage设备链接<input v-model="forms.device.deviceUrl" type="password" autocomplete="off"></label><label class="check"><input type="checkbox" v-model="forms.device.isDefault">设为默认设备</label></div><button @click="act(()=>api.addDevice(forms.device),'设备已安全添加')">添加设备</button></article>
+   <article class="card form-card"><h2>添加 AirPage 设备</h2><p class="hint">设备链接属于凭据，后端仅加密保存设备ID，列表和日志不会回显。</p><div class="form-grid"><label>设备名称<input v-model="forms.device.name"></label><label class="wide">AirPage设备链接<input v-model="forms.device.deviceUrl" type="password" autocomplete="off"></label><label class="check"><input type="checkbox" v-model="forms.device.isDefault">设为默认设备</label></div><button @click="addDevice">添加设备</button></article>
    <div class="grid cards"><article class="card device-card" v-for="d in state.devices"><span class="tag" v-if="d.isDefault">默认</span><div class="big-icon">▣</div><h2>{{d.name}}</h2><p>{{d.width}} × {{d.height}} · {{d.mode}}</p><small>{{d.origin}}</small><button v-if="!d.isDefault" class="outline" @click="act(()=>api.setDefault(d.id),'默认设备已更新')">设为默认</button></article></div>
   </section>
   <section v-if="active==='history'"><article class="card table-card"><table><thead><tr><th>时间</th><th>状态</th><th>BMP</th><th>耗时</th><th>结果</th><th>预览</th></tr></thead><tbody><tr v-for="h in state.history"><td>{{new Date(h.createdAt).toLocaleString()}}</td><td><span :class="['status',!h.uploadSucceeded&&'off']">{{h.uploadSucceeded?'成功':'未推送'}}</span></td><td>{{(h.bmpBytes/1024).toFixed(1)}} KiB</td><td>{{h.durationMs}} ms</td><td>{{h.message}}</td><td><a v-if="h.previewPath" :href="h.previewPath" target="_blank">查看</a></td></tr></tbody></table></article></section>

@@ -1,6 +1,6 @@
 # AirPageSystem
 
-Current release: **v0.0.1**. Self-contained Windows, Linux and macOS packages that do not require a preinstalled .NET runtime are available from [Releases](https://github.com/sunkejava/AirPageSystem/releases).
+Current release: **v0.0.2**. Self-contained Windows, Linux and macOS packages that do not require a preinstalled .NET runtime are available from [Releases](https://github.com/sunkejava/AirPageSystem/releases).
 
 AirPageSystem is a **.NET 10 + Vue 3** snapshot builder and scheduler for AirPage e-ink devices. It collects market data, server telemetry, or custom HTTP JSON, renders 528×792 PNG previews and firmware-compatible 2-bit BMP files, and pushes them to AirPage.
 

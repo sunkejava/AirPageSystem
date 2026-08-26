@@ -1,3 +1,19 @@
+# AirPageSystem v0.0.2
+
+Windows/SQLite 兼容性修复版本。
+
+## 修复
+
+- 修复 SQLite 无法翻译 `DateTimeOffset` 排序导致 `/api/history` 返回 500。
+- 修复 SQLite 无法翻译动态日期比较导致 `/api/dashboard` 返回 500。
+- 修复定时调度器查询 `NextRunAt` 时持续报错、任务无法触发。
+- 前端各区域独立加载，防止统计接口异常时将已经成功的设备新增误报为失败。
+- 添加成功后立即清空设备凭据输入框。
+
+兼容 v0.0.1 已生成的数据库，升级时无需删除 `data/airpage.db`。
+
+---
+
 # AirPageSystem v0.0.1
 
 首个公开版本，提供完整的 AirPage 墨水屏快照管理、面板生成和定时推送能力。

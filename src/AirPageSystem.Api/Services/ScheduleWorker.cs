@@ -22,7 +22,10 @@ public sealed class ScheduleWorker(IServiceScopeFactory scopes, IConfiguration c
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var executor = scope.ServiceProvider.GetRequiredService<PanelExecutionService>();
         var now = DateTimeOffset.UtcNow;
-        var jobs = await db.Schedules.Where(x => x.Enabled && (x.NextRunAt == null || x.NextRunAt <= now)).ToListAsync(ct);
+        // SQLite cannot translate DateTimeOffset comparisons. Keep the filtering in memory
+        // so databases created by v0.0.1 continue to work without a destructive migration.
+        var enabledJobs = await db.Schedules.Where(x => x.Enabled).ToListAsync(ct);
+        var jobs = enabledJobs.Where(x => x.NextRunAt == null || x.NextRunAt <= now).ToArray();
         foreach (var job in jobs)
         {
             try
@@ -49,4 +52,3 @@ public sealed class ScheduleWorker(IServiceScopeFactory scopes, IConfiguration c
         await db.SaveChangesAsync(ct);
     }
 }
-
