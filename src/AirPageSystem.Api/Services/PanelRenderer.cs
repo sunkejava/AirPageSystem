@@ -139,10 +139,10 @@ public sealed class PanelRenderer(IConfiguration config)
         var collection = new FontCollection();
         if (File.Exists(_fontPath))
         {
-            var family = string.Equals(Path.GetExtension(_fontPath), ".ttc", StringComparison.OrdinalIgnoreCase)
-                ? collection.AddCollection(_fontPath).Span[0]
+            var bundledFamily = string.Equals(Path.GetExtension(_fontPath), ".ttc", StringComparison.OrdinalIgnoreCase)
+                ? collection.AddCollection(_fontPath).First()
                 : collection.Add(_fontPath);
-            return family.CreateFont(size, style);
+            return bundledFamily.CreateFont(size, style);
         }
         var families = SystemFonts.Families.ToArray();
         var family = families.FirstOrDefault(x => x.Name.Contains("Noto", StringComparison.OrdinalIgnoreCase));
