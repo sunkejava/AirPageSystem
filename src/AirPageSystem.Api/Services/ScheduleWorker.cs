@@ -40,7 +40,7 @@ public sealed class ScheduleWorker(IServiceScopeFactory scopes, IConfiguration c
                 job.NextRunAt = ScheduleTime.Next(job.Cron, job.TimeZoneId, now);
                 job.LastRunAt = now; job.LastResult = "执行中";
                 await db.SaveChangesAsync(ct);
-                var result = await executor.ExecuteAsync(job.TemplateId, job.DeviceId, true, ct);
+                var result = await executor.ExecuteAsync(job.TemplateId, job.DeviceId, true, ct,job.OwnerUserId,job.RetryPolicyId);
                 job.LastRunAt = now; job.LastResult = result.Push.Message;
                 logger.LogInformation("Schedule {ScheduleId} completed: {Result}", job.Id, result.Push.Message);
             }

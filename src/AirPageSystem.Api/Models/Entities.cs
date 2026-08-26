@@ -13,6 +13,7 @@ public sealed class AirPageDevice
     [MaxLength(20)] public string Mode { get; set; } = "gray4";
     public bool IsDefault { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid? OwnerUserId { get; set; }
 }
 
 public sealed class PanelTemplate
@@ -25,6 +26,7 @@ public sealed class PanelTemplate
     public Guid? DataSourceId { get; set; }
     public bool IsBuiltIn { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid? OwnerUserId { get; set; }
 }
 
 public sealed class DataSourceDefinition
@@ -36,6 +38,7 @@ public sealed class DataSourceDefinition
     public string? ProtectedHeadersJson { get; set; }
     public string? Body { get; set; }
     public bool Enabled { get; set; } = true;
+    public Guid? OwnerUserId { get; set; }
 }
 
 public sealed class ScheduleDefinition
@@ -44,12 +47,14 @@ public sealed class ScheduleDefinition
     [MaxLength(100)] public required string Name { get; set; }
     public Guid TemplateId { get; set; }
     public Guid DeviceId { get; set; }
+    public Guid? RetryPolicyId { get; set; }
     [MaxLength(100)] public required string Cron { get; set; }
     [MaxLength(80)] public string TimeZoneId { get; set; } = "Asia/Shanghai";
     public bool Enabled { get; set; } = true;
     public DateTimeOffset? LastRunAt { get; set; }
     public DateTimeOffset? NextRunAt { get; set; }
     public string? LastResult { get; set; }
+    public Guid? OwnerUserId { get; set; }
 }
 
 public sealed class PushRecord
@@ -64,4 +69,46 @@ public sealed class PushRecord
     public long DurationMs { get; set; }
     [MaxLength(500)] public string Message { get; set; } = "";
     [MaxLength(500)] public string? PreviewPath { get; set; }
+    public Guid? OwnerUserId { get; set; }
+    public int AttemptCount { get; set; } = 1;
+}
+
+public sealed class AppUser
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    [MaxLength(64)] public required string Username { get; set; }
+    [MaxLength(100)] public required string DisplayName { get; set; }
+    public required string PasswordHash { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsAdmin { get; set; }
+    public bool MustChangePassword { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class AppRole
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    [MaxLength(64)] public required string Name { get; set; }
+    [MaxLength(500)] public string Description { get; set; } = "";
+    public string PermissionsJson { get; set; } = "[]";
+}
+
+public sealed class AppUserRole
+{
+    public Guid UserId { get; set; }
+    public Guid RoleId { get; set; }
+}
+
+public sealed class RetryPolicyDefinition
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid OwnerUserId { get; set; }
+    [MaxLength(100)] public required string Name { get; set; }
+    public int MaxAttempts { get; set; } = 3;
+    public int InitialDelayMs { get; set; } = 500;
+    public double BackoffFactor { get; set; } = 2;
+    public int MaxDelayMs { get; set; } = 5000;
+    public bool RetryPreview { get; set; } = true;
+    public bool RetryPush { get; set; } = true;
+    public bool IsDefault { get; set; }
 }
