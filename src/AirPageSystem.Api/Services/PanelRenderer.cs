@@ -137,7 +137,13 @@ public sealed class PanelRenderer(IConfiguration config)
     private Font Font(int size, FontStyle style = FontStyle.Regular)
     {
         var collection = new FontCollection();
-        if (File.Exists(_fontPath)) return collection.Add(_fontPath).CreateFont(size, style);
+        if (File.Exists(_fontPath))
+        {
+            var family = string.Equals(Path.GetExtension(_fontPath), ".ttc", StringComparison.OrdinalIgnoreCase)
+                ? collection.AddCollection(_fontPath).Span[0]
+                : collection.Add(_fontPath);
+            return family.CreateFont(size, style);
+        }
         var families = SystemFonts.Families.ToArray();
         var family = families.FirstOrDefault(x => x.Name.Contains("Noto", StringComparison.OrdinalIgnoreCase));
         if (string.IsNullOrWhiteSpace(family.Name)) family = families.First();

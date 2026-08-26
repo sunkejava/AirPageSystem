@@ -17,7 +17,9 @@ public sealed class TemplatesController(AppDbContext db) : ControllerBase
     [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, SaveTemplateRequest r, CancellationToken ct)
     {
         var item=await db.Templates.FindAsync([id],ct); if(item is null)return NotFound();
-        item.Name=r.Name;item.Type=r.Type;item.Description=r.Description??"";item.DataSourceId=r.DataSourceId;item.SchemaJson=r.SchemaJson;item.UpdatedAt=DateTimeOffset.UtcNow;
+        item.Name=r.Name;item.Description=r.Description??"";
+        if(!item.IsBuiltIn){item.Type=r.Type;item.DataSourceId=r.DataSourceId;item.SchemaJson=r.SchemaJson;}
+        item.UpdatedAt=DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);return Ok(item);
     }
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id,CancellationToken ct)
@@ -26,4 +28,3 @@ public sealed class TemplatesController(AppDbContext db) : ControllerBase
         db.Remove(item);await db.SaveChangesAsync(ct);return NoContent();
     }
 }
-

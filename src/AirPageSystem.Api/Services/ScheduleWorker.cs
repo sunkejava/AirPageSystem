@@ -9,11 +9,11 @@ public sealed class ScheduleWorker(IServiceScopeFactory scopes, IConfiguration c
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var interval = TimeSpan.FromSeconds(Math.Max(5, config.GetValue("Scheduler:PollingSeconds", 15)));
-        using var timer = new PeriodicTimer(interval);
-        while (await timer.WaitForNextTickAsync(stoppingToken))
+        while (!stoppingToken.IsCancellationRequested)
         {
             try { await TickAsync(stoppingToken); }
             catch (Exception ex) { logger.LogError(ex, "Scheduler tick failed."); }
+            await Task.Delay(interval, stoppingToken);
         }
     }
     private async Task TickAsync(CancellationToken ct)
@@ -30,21 +30,24 @@ public sealed class ScheduleWorker(IServiceScopeFactory scopes, IConfiguration c
         {
             try
             {
-                var cron = CronExpression.Parse(job.Cron, CronFormat.Standard);
-                var zone = TimeZoneInfo.FindSystemTimeZoneById(job.TimeZoneId);
                 if (job.NextRunAt is null)
                 {
-                    job.NextRunAt = cron.GetNextOccurrence(now, zone);
+                    job.NextRunAt = ScheduleTime.Next(job.Cron, job.TimeZoneId, now);
                     continue;
                 }
+                // Move the cursor and persist it before external I/O. This prevents a slow
+                // upload or process restart from executing the same occurrence twice.
+                job.NextRunAt = ScheduleTime.Next(job.Cron, job.TimeZoneId, now);
+                job.LastRunAt = now; job.LastResult = "执行中";
+                await db.SaveChangesAsync(ct);
                 var result = await executor.ExecuteAsync(job.TemplateId, job.DeviceId, true, ct);
                 job.LastRunAt = now; job.LastResult = result.Push.Message;
-                job.NextRunAt = cron.GetNextOccurrence(now, zone);
+                logger.LogInformation("Schedule {ScheduleId} completed: {Result}", job.Id, result.Push.Message);
             }
             catch (Exception ex)
             {
-                job.LastRunAt = now; job.LastResult = ex.Message;
-                try { job.NextRunAt = CronExpression.Parse(job.Cron).GetNextOccurrence(now.AddMinutes(1), TimeZoneInfo.FindSystemTimeZoneById(job.TimeZoneId)); }
+                job.LastRunAt = now; job.LastResult = $"失败：{ex.Message}";
+                try { job.NextRunAt = ScheduleTime.Next(job.Cron, job.TimeZoneId, now); }
                 catch { job.Enabled = false; }
                 logger.LogError(ex, "Schedule {ScheduleId} failed.", job.Id);
             }

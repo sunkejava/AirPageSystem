@@ -10,8 +10,12 @@ export const api={
  addDevice:body=>request('/devices',{method:'POST',body:JSON.stringify(body)}),
  setDefault:id=>request('/devices/'+id+'/default',{method:'PUT'}),
  addSchedule:body=>request('/schedules',{method:'POST',body:JSON.stringify(body)}),
+ updateSchedule:(id,body)=>request('/schedules/'+id,{method:'PUT',body:JSON.stringify(body)}),
+ deleteSchedule:id=>request('/schedules/'+id,{method:'DELETE'}),
+ runSchedule:id=>request('/schedules/'+id+'/run',{method:'POST'}),
  toggleSchedule:id=>request('/schedules/'+id+'/toggle',{method:'PUT'}),
  addSource:body=>request('/data-sources',{method:'POST',body:JSON.stringify(body)}),
  testSource:id=>request('/data-sources/'+id+'/test',{method:'POST'}),
- addTemplate:body=>request('/templates',{method:'POST',body:JSON.stringify(body)})
+ addTemplate:body=>request('/templates',{method:'POST',body:JSON.stringify(body)}),
+ updateTemplate:(id,body)=>request('/templates/'+id,{method:'PUT',body:JSON.stringify(body)})
 }
