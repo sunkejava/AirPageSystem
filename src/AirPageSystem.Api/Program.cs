@@ -1,5 +1,6 @@
 using AirPageSystem.Api.Data;
 using AirPageSystem.Api.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
@@ -16,7 +17,6 @@ builder.Services.AddScoped<AirPageClient>();
 builder.Services.AddScoped<PanelExecutionService>();
 builder.Services.AddHostedService<ScheduleWorker>();
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
 
 var app = builder.Build();
 Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "data"));
@@ -28,7 +28,6 @@ using (var scope = app.Services.CreateScope())
 }
 app.UseDefaultFiles();
 app.UseStaticFiles();
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 app.Run();

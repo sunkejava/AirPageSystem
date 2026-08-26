@@ -102,8 +102,9 @@ public sealed class PanelRenderer(IConfiguration config)
     {
         var collection = new FontCollection();
         if (File.Exists(_fontPath)) return collection.Add(_fontPath).CreateFont(size, style);
-        var family = SystemFonts.Families.FirstOrDefault(x => x.Name.Contains("Noto", StringComparison.OrdinalIgnoreCase))
-            ?? SystemFonts.Families.First();
+        var families = SystemFonts.Families.ToArray();
+        var family = families.FirstOrDefault(x => x.Name.Contains("Noto", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(family.Name)) family = families.First();
         return family.CreateFont(size, style);
     }
     private void Header(Image<L8> c, string title, DateTimeOffset at)
@@ -164,4 +165,3 @@ public sealed class PanelRenderer(IConfiguration config)
     }
 }
 public sealed record RenderedPanel(byte[] Bmp, byte[] Png, int Width, int Height);
-
