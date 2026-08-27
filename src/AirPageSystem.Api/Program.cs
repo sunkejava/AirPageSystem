@@ -26,6 +26,7 @@ builder.Services.AddHttpClient("external", client => client.Timeout = TimeSpan.F
 builder.Services.AddSingleton<SystemStatusProvider>();
 builder.Services.AddSingleton<ThreeXUiMonitorProvider>();
 builder.Services.AddSingleton<MarketDataProvider>();
+builder.Services.AddSingleton<ContentPanelProvider>();
 builder.Services.AddSingleton<CustomJsonDataProvider>();
 builder.Services.AddSingleton<PanelRenderer>();
 builder.Services.AddSingleton<RetryExecutor>();

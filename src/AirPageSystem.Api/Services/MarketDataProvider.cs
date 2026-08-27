@@ -7,30 +7,39 @@ public sealed class MarketDataProvider(IHttpClientFactory clients)
     public async Task<WatchSnapshot> GetStocksAsync(string? schemaJson,CancellationToken ct)
     {
         var codes=WatchCodes(schemaJson);var http=clients.CreateClient();http.DefaultRequestHeaders.UserAgent.ParseAdd("AirPageSystem/1.0");
-        var items=new List<WatchItem>();
+        var items=new List<WatchItem>();var failures=0;
         foreach(var code in codes)
         {
-            var secid=(code.StartsWith('6')||code.StartsWith('9')?"1.":"0.")+code;
-            using var quote=await http.GetFromJsonAsync<JsonDocument>($"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f58,f43,f44,f45,f60,f170",ct);
-            if(quote is null||!quote.RootElement.TryGetProperty("data",out var d)||d.ValueKind!=JsonValueKind.Object)continue;
-            var price=Number(d,"f43")/100d;var high=Number(d,"f44")/100d;var low=Number(d,"f45")/100d;var previous=Number(d,"f60")/100d;
-            var weekly=await WeeklyStockAsync(http,secid,ct);items.Add(new(code,String(d,"f58",code),price,Number(d,"f170")/100d,previous<=0?0:(high-low)/previous*100,weekly));
+            try
+            {
+                var secid=(code.StartsWith('6')||code.StartsWith('9')?"1.":"0.")+code;
+                using var quote=await http.GetFromJsonAsync<JsonDocument>($"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f58,f43,f44,f45,f60,f170",ct);
+                if(quote is null||!quote.RootElement.TryGetProperty("data",out var d)||d.ValueKind!=JsonValueKind.Object){failures++;continue;}
+                var price=Number(d,"f43")/100d;var high=Number(d,"f44")/100d;var low=Number(d,"f45")/100d;var previous=Number(d,"f60")/100d;
+                var weekly=await WeeklyStockAsync(http,secid,ct);items.Add(new(code,String(d,"f58",code),price,Number(d,"f170")/100d,previous<=0?0:(high-low)/previous*100,weekly));
+            }
+            catch(Exception) when(!ct.IsCancellationRequested){failures++;}
         }
-        return new(DateTimeOffset.Now,"关注股票行情",items);
+        return new(DateTimeOffset.Now,"关注股票行情",items,Status(codes.Length,items.Count,failures));
     }
 
     public async Task<WatchSnapshot> GetFundsAsync(string? schemaJson,CancellationToken ct)
     {
-        var http=clients.CreateClient();http.DefaultRequestHeaders.UserAgent.ParseAdd("AirPageSystem/1.0");var items=new List<WatchItem>();
-        foreach(var code in WatchCodes(schemaJson))
+        var http=clients.CreateClient();http.DefaultRequestHeaders.UserAgent.ParseAdd("AirPageSystem/1.0");var items=new List<WatchItem>();var codes=WatchCodes(schemaJson);var failures=0;
+        foreach(var code in codes)
         {
-            var text=await http.GetStringAsync($"https://fundgz.1234567.com.cn/js/{code}.js",ct);var start=text.IndexOf('{');var end=text.LastIndexOf('}');if(start<0||end<=start)continue;
-            using var doc=JsonDocument.Parse(text[start..(end+1)]);var d=doc.RootElement;var price=DoubleString(d,"gsz");var daily=DoubleString(d,"gszzl");
-            using var request=new HttpRequestMessage(HttpMethod.Get,$"https://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=7");request.Headers.Referrer=new Uri("https://fundf10.eastmoney.com/");
-            using var response=await http.SendAsync(request,ct);var weekly=0d;if(response.IsSuccessStatusCode){using var history=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));if(history.RootElement.TryGetProperty("Data",out var data)&&data.TryGetProperty("LSJZList",out var rows)){var navs=rows.EnumerateArray().Select(x=>double.TryParse(String(x,"DWJZ",""),out var v)?v:0).Where(x=>x>0).ToArray();if(navs.Length>1)weekly=(navs[0]/navs[^1]-1)*100;}}
-            items.Add(new(code,String(d,"name",code),price,daily,0,weekly));
+            try
+            {
+                using var valuation=new HttpRequestMessage(HttpMethod.Get,$"https://fundgz.1234567.com.cn/js/{code}.js");valuation.Headers.Referrer=new Uri("https://fund.eastmoney.com/");
+                using var valuationResponse=await http.SendAsync(valuation,ct);valuationResponse.EnsureSuccessStatusCode();var text=await valuationResponse.Content.ReadAsStringAsync(ct);var start=text.IndexOf('{');var end=text.LastIndexOf('}');if(start<0||end<=start){failures++;continue;}
+                using var doc=JsonDocument.Parse(text[start..(end+1)]);var d=doc.RootElement;var price=DoubleString(d,"gsz");var daily=DoubleString(d,"gszzl");
+                using var request=new HttpRequestMessage(HttpMethod.Get,$"https://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=7");request.Headers.Referrer=new Uri("https://fundf10.eastmoney.com/");
+                using var response=await http.SendAsync(request,ct);var weekly=0d;if(response.IsSuccessStatusCode){using var history=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));if(history.RootElement.TryGetProperty("Data",out var data)&&data.TryGetProperty("LSJZList",out var rows)){var navs=rows.EnumerateArray().Select(x=>double.TryParse(String(x,"DWJZ",""),out var v)?v:0).Where(x=>x>0).ToArray();if(navs.Length>1)weekly=(navs[0]/navs[^1]-1)*100;}}
+                items.Add(new(code,String(d,"name",code),price,daily,0,weekly));
+            }
+            catch(Exception) when(!ct.IsCancellationRequested){failures++;}
         }
-        return new(DateTimeOffset.Now,"关注基金行情",items);
+        return new(DateTimeOffset.Now,"关注基金行情",items,Status(codes.Length,items.Count,failures));
     }
 
     private static string[] WatchCodes(string? json){try{using var d=JsonDocument.Parse(json??"{}");return d.RootElement.TryGetProperty("codes",out var c)&&c.ValueKind==JsonValueKind.Array?c.EnumerateArray().Select(x=>x.GetString()?.Trim()).Where(x=>!string.IsNullOrWhiteSpace(x)&&x!.All(char.IsDigit)).Take(10).Cast<string>().ToArray():[];}catch{return[];}}
@@ -38,6 +47,7 @@ public sealed class MarketDataProvider(IHttpClientFactory clients)
     private static double Number(JsonElement e,string n)=>e.TryGetProperty(n,out var x)&&x.ValueKind==JsonValueKind.Number?x.GetDouble():0;
     private static string String(JsonElement e,string n,string fallback)=>e.TryGetProperty(n,out var x)&&x.ValueKind==JsonValueKind.String?x.GetString()??fallback:fallback;
     private static double DoubleString(JsonElement e,string n)=>double.TryParse(String(e,n,""),out var v)?v:0;
+    private static string Status(int requested,int loaded,int failures)=>requested==0?"未配置关注代码":failures==0?$"已加载 {loaded} 项":loaded>0?$"已加载 {loaded}/{requested} 项，部分行情暂不可用":"行情源暂不可用，请稍后刷新";
     public async Task<MarketSnapshot> GetAsync(CancellationToken ct)
     {
         var http = clients.CreateClient();
@@ -93,5 +103,5 @@ public sealed record MarketSnapshot(DateTimeOffset CollectedAt, IReadOnlyList<In
     IReadOnlyList<StockItem> Gainers, IReadOnlyList<StockItem> Losers, IReadOnlyList<StockItem> Amplitudes);
 public sealed record IndexItem(string Name, double Price, double ChangePercent);
 public sealed record StockItem(string Code, string Name, double Price, double ChangePercent, double AmplitudePercent);
-public sealed record WatchSnapshot(DateTimeOffset CollectedAt,string Title,IReadOnlyList<WatchItem> Items);
+public sealed record WatchSnapshot(DateTimeOffset CollectedAt,string Title,IReadOnlyList<WatchItem> Items,string Status);
 public sealed record WatchItem(string Code,string Name,double Price,double DailyPercent,double AmplitudePercent,double WeeklyPercent);

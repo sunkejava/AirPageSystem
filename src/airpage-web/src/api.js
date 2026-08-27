@@ -26,6 +26,7 @@ export const api={
  testSource:id=>request('/data-sources/'+id+'/test',{method:'POST'}),
  addTemplate:body=>request('/templates',{method:'POST',body:JSON.stringify(body)}),
  updateTemplate:(id,body)=>request('/templates/'+id,{method:'PUT',body:JSON.stringify(body)}),
+ deleteTemplate:id=>request('/templates/'+id,{method:'DELETE'}),
  retryPolicies:()=>request('/retry-policies'),addRetryPolicy:body=>request('/retry-policies',{method:'POST',body:JSON.stringify(body)}),updateRetryPolicy:(id,body)=>request('/retry-policies/'+id,{method:'PUT',body:JSON.stringify(body)}),deleteRetryPolicy:id=>request('/retry-policies/'+id,{method:'DELETE'}),
  users:()=>request('/admin/users'),roles:()=>request('/admin/roles'),permissions:()=>request('/admin/permissions'),addUser:body=>request('/admin/users',{method:'POST',body:JSON.stringify(body)}),updateUser:(id,body)=>request('/admin/users/'+id,{method:'PUT',body:JSON.stringify(body)}),addRole:body=>request('/admin/roles',{method:'POST',body:JSON.stringify(body)}),updateRole:(id,body)=>request('/admin/roles/'+id,{method:'PUT',body:JSON.stringify(body)}),deleteRole:id=>request('/admin/roles/'+id,{method:'DELETE'})
 }

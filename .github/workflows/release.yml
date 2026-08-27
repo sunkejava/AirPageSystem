@@ -12,8 +12,8 @@ permissions:
 
 env:
   # Keep this marker aligned with the release being published; changing it retriggers the release workflow.
-  VERSION: 0.0.7
-  TAG: v0.0.7
+  VERSION: 0.0.8
+  TAG: v0.0.8
 
 jobs:
   release:

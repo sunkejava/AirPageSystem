@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AirPageSystem.Api.Services;
 
 public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider market, SystemStatusProvider system,
-    ThreeXUiMonitorProvider threeXUi, CustomJsonDataProvider custom, PanelRenderer renderer, AirPageClient airPage, IWebHostEnvironment environment,
+    ThreeXUiMonitorProvider threeXUi, ContentPanelProvider content, CustomJsonDataProvider custom, PanelRenderer renderer, AirPageClient airPage, IWebHostEnvironment environment,
     IConfiguration configuration, RetryExecutor retry)
 {
     public async Task<ExecutionResult> ExecuteAsync(Guid templateId, Guid? deviceId, bool push, CancellationToken ct, Guid? ownerUserId=null, Guid? retryPolicyId=null)
@@ -22,6 +22,10 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
             "market" => renderer.RenderMarket(await market.GetAsync(token)),
             "stock-watch" => renderer.RenderWatch(await market.GetStocksAsync(template.SchemaJson,token),false),
             "fund-watch" => renderer.RenderWatch(await market.GetFundsAsync(template.SchemaJson,token),true),
+            "weather-environment" => renderer.RenderContent(await content.GetWeatherAsync(template.SchemaJson,token)),
+            "news-trending" => renderer.RenderContent(await content.GetNewsAsync(false,token)),
+            "bilibili-hot" => renderer.RenderContent(await content.GetBilibiliAsync(token)),
+            "ai-news" => renderer.RenderContent(await content.GetNewsAsync(true,token)),
             "server-status" => renderer.RenderSystem(await system.GetAsync(token)),
             "3xui-monitor" => renderer.RenderThreeXUi(await threeXUi.GetAsync(token)),
             "custom" => await RenderCustomAsync(template,token),
@@ -65,6 +69,10 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
             "market"=>renderer.RenderMarket(await market.GetAsync(ct)),
             "stock-watch"=>renderer.RenderWatch(await market.GetStocksAsync(schemaJson,ct),false),
             "fund-watch"=>renderer.RenderWatch(await market.GetFundsAsync(schemaJson,ct),true),
+            "weather-environment"=>renderer.RenderContent(await content.GetWeatherAsync(schemaJson,ct)),
+            "news-trending"=>renderer.RenderContent(await content.GetNewsAsync(false,ct)),
+            "bilibili-hot"=>renderer.RenderContent(await content.GetBilibiliAsync(ct)),
+            "ai-news"=>renderer.RenderContent(await content.GetNewsAsync(true,ct)),
             "designer"=>renderer.RenderDesigner(name,schemaJson??"{}",DateTimeOffset.Now),
             "daily-quote"=>renderer.RenderDesigner(name,schemaJson??"{}",DateTimeOffset.Now),
             "custom"=>await RenderCustomAsync(template,ct),

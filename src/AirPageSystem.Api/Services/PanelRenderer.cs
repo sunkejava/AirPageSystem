@@ -70,8 +70,18 @@ public sealed class PanelRenderer(IConfiguration config)
             Text(canvas,x.Price.ToString(fund?"0.0000":"0.00"),218,y,17);Text(canvas,$"{x.DailyPercent:+0.00;-0.00;0.00}%",305,y,17);
             Text(canvas,$"{x.WeeklyPercent:+0.00;-0.00;0.00}%",392,y,17);Text(canvas,fund?"-":$"{x.AmplitudePercent:0.00}%",470,y,15);
         }
-        if(snapshot.Items.Count==0)Center(canvas,"请在模板编辑页填写关注代码",_width/2,330,24);
-        Footer(canvas,"行情可能延迟｜仅供参考，不构成投资建议",fund?"来源：天天基金、东方财富":"来源：东方财富");
+        if(snapshot.Items.Count==0)Center(canvas,snapshot.Status,_width/2,330,21);
+        Footer(canvas,$"{snapshot.Status}｜仅供参考，不构成投资建议",fund?"来源：天天基金、东方财富":"来源：东方财富");
+    });
+
+    public RenderedPanel RenderContent(ContentSnapshot snapshot) => Render(canvas =>
+    {
+        Header(canvas,snapshot.Title,snapshot.CollectedAt,"内容快照");var x=18;
+        foreach(var metric in snapshot.Metrics.Take(3)){Metric(canvas,x,105,Trim(metric.Key,8),Trim(metric.Value,13),"");x+=166;}
+        Text(canvas,"最新内容",18,218,24,true);var i=0;
+        foreach(var row in snapshot.Rows.Take(9)){var y=260+i*49;if(i%2==0)canvas.Mutate(c=>c.Fill(Color.ParseHex("EEEEEE"),new Rectangle(14,y-5,500,43)));Text(canvas,Trim(row.Title,27),20,y,17,true);Text(canvas,Trim(row.Detail,14),20,y+22,13);Text(canvas,Trim(row.Value,15),385,y+22,13);i++;}
+        if(snapshot.Rows.Count==0)Center(canvas,snapshot.Status,_width/2,370,22);
+        Footer(canvas,Trim(snapshot.Status,34),$"来源：{snapshot.Source}");
     });
 
     public RenderedPanel RenderSystem(SystemStatusSnapshot s) => Render(canvas =>

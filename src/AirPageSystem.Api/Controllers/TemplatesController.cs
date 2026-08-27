@@ -12,7 +12,7 @@ public sealed class TemplatesController(AppDbContext db,CurrentUser current) : C
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct)
     {
         var items=await db.Templates.Where(x=>x.OwnerUserId==null||x.OwnerUserId==current.Id).OrderBy(x=>x.Name).ToListAsync(ct);
-        var personalTypes=items.Where(x=>x.OwnerUserId==current.Id&&x.Type is ("stock-watch" or "fund-watch")).Select(x=>x.Type).ToHashSet();
+        var personalTypes=items.Where(x=>x.OwnerUserId==current.Id&&x.Type is ("stock-watch" or "fund-watch" or "weather-environment")).Select(x=>x.Type).ToHashSet();
         return Ok(items.Where(x=>!(x.OwnerUserId is null&&personalTypes.Contains(x.Type))));
     }
     [HttpPost] public async Task<IActionResult> Save(SaveTemplateRequest r, CancellationToken ct)
@@ -24,7 +24,7 @@ public sealed class TemplatesController(AppDbContext db,CurrentUser current) : C
     [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, SaveTemplateRequest r, CancellationToken ct)
     {
         await current.DemandAsync("templates.manage",ct);var item=await db.Templates.FirstOrDefaultAsync(x=>x.Id==id&&(x.OwnerUserId==current.Id||x.OwnerUserId==null),ct); if(item is null)return NotFound();
-        if(item.IsBuiltIn&&item.Type is ("stock-watch" or "fund-watch"))
+        if(item.IsBuiltIn&&item.Type is ("stock-watch" or "fund-watch" or "weather-environment"))
         {
             var personal=await db.Templates.FirstOrDefaultAsync(x=>x.OwnerUserId==current.Id&&x.Type==item.Type,ct);
             personal??=new PanelTemplate{Name=r.Name,Type=item.Type,Description=r.Description??item.Description,OwnerUserId=current.Id};

@@ -20,9 +20,10 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
             var ports = database.Inbounds.Select(x => x.Port).Where(x => x is > 0 and <= 65535).ToHashSet();
             var (tcp, udp) = CountConnections(ports);
 
+            var databaseAvailable=dbPath is not null&&database.Status!="数据库读取失败";
             return new ThreeXUiSnapshot(
-                panelProcesses.Length > 0,
-                xrayProcesses.Length > 0,
+                panelProcesses.Length > 0||databaseAvailable,
+                xrayProcesses.Length > 0||(databaseAvailable&&database.EnabledInboundCount>0),
                 VersionOf(panelProcesses, configuration["ThreeXUi:PanelVersion"]),
                 VersionOf(xrayProcesses, configuration["ThreeXUi:XrayVersion"]),
                 UptimeOf(panelProcesses.Concat(xrayProcesses)),
@@ -40,7 +41,7 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
                 LocalAddresses(),
                 database.Inbounds,
                 DateTimeOffset.Now,
-                dbPath is null ? "未找到3x-ui数据库" : database.Status);
+                dbPath is null ? "未找到3x-ui数据库" : panelProcesses.Length==0&&databaseAvailable?database.Status+"｜进程状态由数据库推断":database.Status);
         }
         finally
         {
@@ -69,6 +70,8 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
             await connection.OpenAsync(ct);
             if (!await HasTableAsync(connection, "inbounds", ct)) return new DatabaseSnapshot(Status: "数据库缺少inbounds表");
 
+            var columns=await ColumnsAsync(connection,"inbounds",ct);var required=new[]{"remark","protocol","port","up","down","enable"};
+            if(required.Any(x=>!columns.Contains(x)))return new DatabaseSnapshot(Status:"inbounds表结构不兼容："+string.Join(',',required.Where(x=>!columns.Contains(x))));
             var inbounds = new List<ThreeXUiInbound>();
             await using (var command = connection.CreateCommand())
             {
@@ -80,7 +83,7 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
                         Number64(reader, 3), Number64(reader, 4), Number(reader, 5) != 0));
             }
 
-            var clients = await CountDistinctAsync(connection, "client_traffics", "email", ct);
+            var clients = await HasColumnAsync(connection,"client_traffics","email",ct)?await CountDistinctAsync(connection, "client_traffics", "email", ct):0;
             if (await HasTableAsync(connection, "clients", ct)) clients = await CountAsync(connection, "clients", ct);
             var ips = await CountClientIpsAsync(connection, ct);
             var clientStats=await ReadClientStatsAsync(connection,ct);
@@ -101,8 +104,9 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
     }
     private static async Task<(int Enabled,int Recent,int Expired,long Used,long Quota)> ReadClientStatsAsync(SqliteConnection connection,CancellationToken ct)
     {
-        if(!await HasTableAsync(connection,"client_traffics",ct))return(0,0,0,0,0);var now=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();var recent=now-180_000;
-        await using var command=connection.CreateCommand();command.CommandText="SELECT COALESCE(SUM(CASE WHEN enable<>0 THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN last_online >= $recent THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN expiry_time>0 AND expiry_time<$now THEN 1 ELSE 0 END),0),COALESCE(SUM(up+down),0),COALESCE(SUM(total),0) FROM client_traffics";command.Parameters.AddWithValue("$recent",recent);command.Parameters.AddWithValue("$now",now);await using var reader=await command.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))return(0,0,0,0,0);return(Number(reader,0),Number(reader,1),Number(reader,2),Number64(reader,3),Number64(reader,4));
+        if(!await HasTableAsync(connection,"client_traffics",ct))return(0,0,0,0,0);var cols=await ColumnsAsync(connection,"client_traffics",ct);var now=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();var recent=now-180_000;
+        string sum(string column)=>cols.Contains(column)?$"COALESCE(SUM({column}),0)":"0";var enabled=cols.Contains("enable")?"COALESCE(SUM(CASE WHEN enable<>0 THEN 1 ELSE 0 END),0)":"COUNT(*)";var active=cols.Contains("last_online")?"COALESCE(SUM(CASE WHEN last_online >= $recent THEN 1 ELSE 0 END),0)":"0";var expired=cols.Contains("expiry_time")?"COALESCE(SUM(CASE WHEN expiry_time>0 AND expiry_time<$now THEN 1 ELSE 0 END),0)":"0";
+        await using var command=connection.CreateCommand();command.CommandText=$"SELECT {enabled},{active},{expired},{sum("up")}+{sum("down")},{sum("total")} FROM client_traffics";command.Parameters.AddWithValue("$recent",recent);command.Parameters.AddWithValue("$now",now);await using var reader=await command.ExecuteReaderAsync(ct);if(!await reader.ReadAsync(ct))return(0,0,0,0,0);return(Number(reader,0),Number(reader,1),Number(reader,2),Number64(reader,3),Number64(reader,4));
     }
 
     private static async Task<bool> HasTableAsync(SqliteConnection connection, string table, CancellationToken ct)
@@ -112,6 +116,12 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
         command.Parameters.AddWithValue("$name", table);
         return Convert.ToInt32(await command.ExecuteScalarAsync(ct)) > 0;
     }
+
+    private static async Task<HashSet<string>> ColumnsAsync(SqliteConnection connection,string table,CancellationToken ct)
+    {
+        var result=new HashSet<string>(StringComparer.OrdinalIgnoreCase);if(!await HasTableAsync(connection,table,ct))return result;await using var command=connection.CreateCommand();command.CommandText=$"PRAGMA table_info(\"{table}\")";await using var reader=await command.ExecuteReaderAsync(ct);while(await reader.ReadAsync(ct))if(!reader.IsDBNull(1))result.Add(reader.GetString(1));return result;
+    }
+    private static async Task<bool> HasColumnAsync(SqliteConnection connection,string table,string column,CancellationToken ct)=>(await ColumnsAsync(connection,table,ct)).Contains(column);
 
     private static async Task<int> CountAsync(SqliteConnection connection, string table, CancellationToken ct)
     {
@@ -133,7 +143,8 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
         if (!await HasTableAsync(connection, "inbound_client_ips", ct)) return 0;
         var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT ips FROM inbound_client_ips";
+        var columns=await ColumnsAsync(connection,"inbound_client_ips",ct);var column=columns.Contains("ips")?"ips":columns.Contains("client_ip")?"client_ip":columns.Contains("ip")?"ip":null;if(column is null)return 0;
+        command.CommandText = $"SELECT \"{column}\" FROM inbound_client_ips";
         await using var reader = await command.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
