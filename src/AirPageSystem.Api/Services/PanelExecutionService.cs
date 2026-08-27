@@ -20,10 +20,13 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
         async Task<RenderedPanel> Build(CancellationToken token)=>template.Type switch
         {
             "market" => renderer.RenderMarket(await market.GetAsync(token)),
+            "stock-watch" => renderer.RenderWatch(await market.GetStocksAsync(template.SchemaJson,token),false),
+            "fund-watch" => renderer.RenderWatch(await market.GetFundsAsync(template.SchemaJson,token),true),
             "server-status" => renderer.RenderSystem(await system.GetAsync(token)),
             "3xui-monitor" => renderer.RenderThreeXUi(await threeXUi.GetAsync(token)),
             "custom" => await RenderCustomAsync(template,token),
             "designer" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",DateTimeOffset.Now),
+            "daily-quote" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",DateTimeOffset.Now),
             _ => throw new InvalidOperationException($"不支持的模板类型：{template.Type}")
         };
         var renderResult=policy.RetryPreview?await retry.RunAsync(Build,policy,"面板生成",ct):(await Build(ct),1);
@@ -52,6 +55,21 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
         };
         db.PushRecords.Add(record); await db.SaveChangesAsync(ct);
         return new(record.Id, rendered.Bmp, rendered.Png, record.PreviewPath, pushed);
+    }
+
+    public async Task<RenderedPanel> PreviewAsync(string name,string type,Guid? dataSourceId,string? schemaJson,Guid ownerUserId,CancellationToken ct)
+    {
+        var template=new PanelTemplate{Name=name,Type=type,Description="",DataSourceId=dataSourceId,SchemaJson=schemaJson,OwnerUserId=ownerUserId};
+        return type switch
+        {
+            "market"=>renderer.RenderMarket(await market.GetAsync(ct)),
+            "stock-watch"=>renderer.RenderWatch(await market.GetStocksAsync(schemaJson,ct),false),
+            "fund-watch"=>renderer.RenderWatch(await market.GetFundsAsync(schemaJson,ct),true),
+            "designer"=>renderer.RenderDesigner(name,schemaJson??"{}",DateTimeOffset.Now),
+            "daily-quote"=>renderer.RenderDesigner(name,schemaJson??"{}",DateTimeOffset.Now),
+            "custom"=>await RenderCustomAsync(template,ct),
+            _=>throw new InvalidOperationException("该模板类型不支持代码预览。")
+        };
     }
 
     private async Task<RenderedPanel> RenderCustomAsync(PanelTemplate template, CancellationToken ct)

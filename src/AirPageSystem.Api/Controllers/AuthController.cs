@@ -26,7 +26,13 @@ public sealed class AuthController(AppDbContext db, IPasswordHasher<AppUser> has
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,new ClaimsPrincipal(identity));
         return Ok(await Profile(user,ct));
     }
-    [HttpPost("logout")] public async Task<IActionResult> Logout(){await HttpContext.SignOutAsync();return NoContent();}
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        Response.Cookies.Delete("AirPageSystem.Auth");
+        return NoContent();
+    }
     [HttpGet("me")] public async Task<IActionResult> Me(CancellationToken ct){var user=await db.Users.FindAsync([current.Id],ct);return user is null?Unauthorized():Ok(await Profile(user,ct));}
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request,CancellationToken ct)

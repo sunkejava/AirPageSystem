@@ -14,6 +14,7 @@ export const api={
  dashboard:()=>request('/dashboard'),templates:()=>request('/templates'),devices:()=>request('/devices'),
  schedules:()=>request('/schedules'),sources:()=>request('/data-sources'),history:()=>request('/history'),
  execute:body=>request('/panels/execute',{method:'POST',body:JSON.stringify(body)}),
+ previewTemplate:async body=>{const response=await fetch('/api/panels/preview',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok)throw new Error(await response.text()||('HTTP '+response.status));return response.blob()},
  addDevice:body=>request('/devices',{method:'POST',body:JSON.stringify(body)}),
  setDefault:id=>request('/devices/'+id+'/default',{method:'PUT'}),
  addSchedule:body=>request('/schedules',{method:'POST',body:JSON.stringify(body)}),

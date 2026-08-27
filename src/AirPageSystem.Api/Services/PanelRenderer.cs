@@ -58,6 +58,22 @@ public sealed class PanelRenderer(IConfiguration config)
         Footer(canvas, "实时行情会波动｜仅供参考，不构成投资建议", "来源：腾讯证券、东方财富");
     });
 
+    public RenderedPanel RenderWatch(WatchSnapshot snapshot,bool fund) => Render(canvas =>
+    {
+        Header(canvas,snapshot.Title,snapshot.CollectedAt,"行情快照");
+        Text(canvas,fund?"基金代码 / 名称":"股票代码 / 名称",18,104,20,true);
+        Text(canvas,"现价/估值     今日       本周       振幅",178,104,16);
+        for(var i=0;i<Math.Min(10,snapshot.Items.Count);i++)
+        {
+            var x=snapshot.Items[i];var y=148+i*55;if(i%2==0)canvas.Mutate(c=>c.Fill(Color.ParseHex("EEEEEE"),new Rectangle(14,y-7,500,48)));
+            Text(canvas,x.Code,20,y,17,true);Text(canvas,Trim(x.Name,8),93,y,17);
+            Text(canvas,x.Price.ToString(fund?"0.0000":"0.00"),218,y,17);Text(canvas,$"{x.DailyPercent:+0.00;-0.00;0.00}%",305,y,17);
+            Text(canvas,$"{x.WeeklyPercent:+0.00;-0.00;0.00}%",392,y,17);Text(canvas,fund?"-":$"{x.AmplitudePercent:0.00}%",470,y,15);
+        }
+        if(snapshot.Items.Count==0)Center(canvas,"请在模板编辑页填写关注代码",_width/2,330,24);
+        Footer(canvas,"行情可能延迟｜仅供参考，不构成投资建议",fund?"来源：天天基金、东方财富":"来源：东方财富");
+    });
+
     public RenderedPanel RenderSystem(SystemStatusSnapshot s) => Render(canvas =>
     {
         Header(canvas, "服务端状态面板", s.CollectedAt);

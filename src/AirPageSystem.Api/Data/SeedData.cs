@@ -22,6 +22,9 @@ public static class SeedData
         if (!types.Contains("market")) db.Templates.Add(new PanelTemplate { Name = "最新行情面板", Type = "market", Description = "三大指数、市场广度、涨跌停及异动股票", IsBuiltIn = true });
         if (!types.Contains("server-status")) db.Templates.Add(new PanelTemplate { Name = "服务端状态面板", Type = "server-status", Description = "CPU、内存、磁盘、网络与进程排行", IsBuiltIn = true });
         if (!types.Contains("3xui-monitor")) db.Templates.Add(new PanelTemplate { Name = "3xui代理监控", Type = "3xui-monitor", Description = "3x-ui/Xray状态、流量、入站、客户端、IP与连接数", IsBuiltIn = true });
+        if (!types.Contains("stock-watch")) db.Templates.Add(new PanelTemplate { Name = "关注股票行情", Type = "stock-watch", Description = "自选股票当日涨跌、振幅及近一周表现", IsBuiltIn = true, SchemaJson = "{\"codes\":[\"600519\",\"000001\",\"300750\"]}" });
+        if (!types.Contains("fund-watch")) db.Templates.Add(new PanelTemplate { Name = "关注基金行情", Type = "fund-watch", Description = "自选基金最新估值、当日与近一周表现", IsBuiltIn = true, SchemaJson = "{\"codes\":[\"005693\",\"017175\",\"023638\"]}" });
+        if (!types.Contains("daily-quote")) db.Templates.Add(new PanelTemplate { Name = "每日金句", Type = "daily-quote", Description = "适合待机展示的高对比度金句卡片", IsBuiltIn = true, SchemaJson = "{\"preset\":\"quote\",\"title\":\"每日金句\",\"quote\":\"保持专注，把复杂的事做简单。\",\"author\":\"佚名\"}" });
         if (!types.Contains("custom")) db.Templates.Add(new PanelTemplate { Name = "自定义数据面板", Type = "custom", Description = "将HTTP JSON数据绑定到标题、指标和列表", IsBuiltIn = true,
             SchemaJson = """{"titlePath":"$.title","metrics":[{"label":"状态","path":"$.status"}],"itemsPath":"$.items"}""" });
         await db.SaveChangesAsync();

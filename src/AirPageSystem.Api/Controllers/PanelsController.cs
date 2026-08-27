@@ -10,6 +10,9 @@ public sealed class PanelsController(PanelExecutionService executor,AppDbContext
 {
  [HttpPost("panels/execute")] public async Task<IActionResult> Execute(ExecutePanelRequest r,CancellationToken ct)
  {await current.DemandAsync(r.Push?"panels.push":"menu.templates",ct);var x=await executor.ExecuteAsync(r.TemplateId,r.DeviceId,r.Push,ct,current.Id,r.RetryPolicyId);return Ok(new{x.RecordId,x.PreviewPath,bmpBytes=x.Bmp.Length,pngBytes=x.Png.Length,x.Push});}
+ [HttpPost("panels/preview")]
+ public async Task<IActionResult> Preview(PreviewTemplateRequest r,CancellationToken ct)
+ {await current.DemandAsync("menu.templates",ct);var image=await executor.PreviewAsync(r.Name,r.Type,r.DataSourceId,r.SchemaJson,current.Id,ct);return File(image.Png,"image/png");}
  [HttpGet("history")] public async Task<IActionResult> History(CancellationToken ct)
  {
   // SQLite stores DateTimeOffset values but cannot translate ORDER BY for that CLR type.
