@@ -51,7 +51,7 @@ public sealed class SchedulesController(AppDbContext db, PanelExecutionService e
  private async Task<IActionResult?> ValidateReferences(SaveScheduleRequest r,CancellationToken ct)
  {
   try{_ = ScheduleTime.Next(r.Cron,r.TimeZoneId,DateTimeOffset.UtcNow);}catch(Exception ex){return BadRequest($"定时配置无效：{ex.Message}");}
-  if(!await db.Templates.AnyAsync(x=>x.Id==r.TemplateId&&(x.OwnerUserId==null||x.OwnerUserId==current.Id),ct))return BadRequest("面板模板不存在。");
+  if(!await db.Templates.AnyAsync(x=>!x.IsDeleted&&x.Id==r.TemplateId&&(x.OwnerUserId==null||x.OwnerUserId==current.Id),ct))return BadRequest("面板模板不存在。");
   if(!await db.Devices.AnyAsync(x=>x.Id==r.DeviceId&&x.OwnerUserId==current.Id,ct))return BadRequest("AirPage设备不存在。");
   if(r.RetryPolicyId.HasValue&&!await db.RetryPolicies.AnyAsync(x=>x.Id==r.RetryPolicyId&&x.OwnerUserId==current.Id,ct))return BadRequest("重试规则不存在。");
   return null;

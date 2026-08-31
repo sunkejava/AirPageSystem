@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace AirPageSystem.Api.Services;
 
@@ -12,15 +13,13 @@ public sealed class MarketDataProvider(IHttpClientFactory clients)
         {
             try
             {
-                var secid=(code.StartsWith('6')||code.StartsWith('9')?"1.":"0.")+code;
-                using var quote=await http.GetFromJsonAsync<JsonDocument>($"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f58,f43,f44,f45,f60,f170",ct);
-                if(quote is null||!quote.RootElement.TryGetProperty("data",out var d)||d.ValueKind!=JsonValueKind.Object){failures++;continue;}
-                var price=Number(d,"f43")/100d;var high=Number(d,"f44")/100d;var low=Number(d,"f45")/100d;var previous=Number(d,"f60")/100d;
-                var weekly=await WeeklyStockAsync(http,secid,ct);items.Add(new(code,String(d,"f58",code),price,Number(d,"f170")/100d,previous<=0?0:(high-low)/previous*100,weekly));
+                var market=code.StartsWith('6')||code.StartsWith('9')?"sh":"sz";var bytes=await http.GetByteArrayAsync($"https://qt.gtimg.cn/q={market}{code}",ct);var text=System.Text.Encoding.GetEncoding("GB18030").GetString(bytes);var quoted=Regex.Match(text,"\\\"(?<v>[^\\\"]+)\\\"");
+                if(!quoted.Success){failures++;continue;}var p=quoted.Groups["v"].Value.Split('~');if(p.Length<35){failures++;continue;}var price=Parse(p,3);var previous=Parse(p,4);var high=Parse(p,33);var low=Parse(p,34);var daily=Parse(p,32);var secid=(market=="sh"?"1.":"0.")+code;
+                var weekly=await SafeWeeklyStockAsync(http,secid,ct);items.Add(new(code,p[1],price,daily,previous<=0?0:(high-low)/previous*100,weekly));
             }
             catch(Exception) when(!ct.IsCancellationRequested){failures++;}
         }
-        return new(DateTimeOffset.Now,"关注股票行情",items,Status(codes.Length,items.Count,failures));
+        return new(ChinaTime.Now,"关注股票行情",items,Status(codes.Length,items.Count,failures));
     }
 
     public async Task<WatchSnapshot> GetFundsAsync(string? schemaJson,CancellationToken ct)
@@ -30,20 +29,19 @@ public sealed class MarketDataProvider(IHttpClientFactory clients)
         {
             try
             {
-                using var valuation=new HttpRequestMessage(HttpMethod.Get,$"https://fundgz.1234567.com.cn/js/{code}.js");valuation.Headers.Referrer=new Uri("https://fund.eastmoney.com/");
-                using var valuationResponse=await http.SendAsync(valuation,ct);valuationResponse.EnsureSuccessStatusCode();var text=await valuationResponse.Content.ReadAsStringAsync(ct);var start=text.IndexOf('{');var end=text.LastIndexOf('}');if(start<0||end<=start){failures++;continue;}
-                using var doc=JsonDocument.Parse(text[start..(end+1)]);var d=doc.RootElement;var price=DoubleString(d,"gsz");var daily=DoubleString(d,"gszzl");
-                using var request=new HttpRequestMessage(HttpMethod.Get,$"https://api.fund.eastmoney.com/f10/lsjz?fundCode={code}&pageIndex=1&pageSize=7");request.Headers.Referrer=new Uri("https://fundf10.eastmoney.com/");
-                using var response=await http.SendAsync(request,ct);var weekly=0d;if(response.IsSuccessStatusCode){using var history=JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));if(history.RootElement.TryGetProperty("Data",out var data)&&data.TryGetProperty("LSJZList",out var rows)){var navs=rows.EnumerateArray().Select(x=>double.TryParse(String(x,"DWJZ",""),out var v)?v:0).Where(x=>x>0).ToArray();if(navs.Length>1)weekly=(navs[0]/navs[^1]-1)*100;}}
-                items.Add(new(code,String(d,"name",code),price,daily,0,weekly));
+                using var request=new HttpRequestMessage(HttpMethod.Get,$"https://fund.eastmoney.com/pingzhongdata/{code}.js?v={DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");request.Headers.Referrer=new Uri($"https://fund.eastmoney.com/{code}.html");using var response=await http.SendAsync(request,ct);response.EnsureSuccessStatusCode();var script=await response.Content.ReadAsStringAsync(ct);
+                var name=Regex.Match(script,"var\\s+fS_name\\s*=\\s*\"(?<v>[^\"]+)\"").Groups["v"].Value;var trendMatch=Regex.Match(script,"Data_netWorthTrend\\s*=\\s*(?<v>\\[[^;]+\\])");if(!trendMatch.Success){failures++;continue;}using var trend=JsonDocument.Parse(trendMatch.Groups["v"].Value);var rows=trend.RootElement.EnumerateArray().TakeLast(7).ToArray();if(rows.Length==0){failures++;continue;}var price=Number(rows[^1],"y");var daily=Number(rows[^1],"equityReturn");var first=Number(rows[0],"y");var weekly=first>0?(price/first-1)*100:0;
+                items.Add(new(code,string.IsNullOrWhiteSpace(name)?code:name,price,daily,0,weekly));
             }
             catch(Exception) when(!ct.IsCancellationRequested){failures++;}
         }
-        return new(DateTimeOffset.Now,"关注基金行情",items,Status(codes.Length,items.Count,failures));
+        return new(ChinaTime.Now,"关注基金行情",items,Status(codes.Length,items.Count,failures));
     }
 
     private static string[] WatchCodes(string? json){try{using var d=JsonDocument.Parse(json??"{}");return d.RootElement.TryGetProperty("codes",out var c)&&c.ValueKind==JsonValueKind.Array?c.EnumerateArray().Select(x=>x.GetString()?.Trim()).Where(x=>!string.IsNullOrWhiteSpace(x)&&x!.All(char.IsDigit)).Take(10).Cast<string>().ToArray():[];}catch{return[];}}
     private static async Task<double> WeeklyStockAsync(HttpClient http,string secid,CancellationToken ct){using var d=await http.GetFromJsonAsync<JsonDocument>($"https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={secid}&klt=101&fqt=1&lmt=6&fields1=f1&fields2=f51,f52,f53,f54,f55",ct);if(d is null||!d.RootElement.TryGetProperty("data",out var data)||!data.TryGetProperty("klines",out var rows))return 0;var closes=rows.EnumerateArray().Select(x=>double.TryParse(x.GetString()?.Split(',').ElementAtOrDefault(2),out var v)?v:0).Where(x=>x>0).ToArray();return closes.Length>1?(closes[^1]/closes[0]-1)*100:0;}
+    private static async Task<double> SafeWeeklyStockAsync(HttpClient http,string secid,CancellationToken ct){try{return await WeeklyStockAsync(http,secid,ct);}catch(Exception) when(!ct.IsCancellationRequested){return 0;}}
+    private static double Parse(string[] values,int index)=>index<values.Length&&double.TryParse(values[index],System.Globalization.NumberStyles.Any,System.Globalization.CultureInfo.InvariantCulture,out var value)?value:0;
     private static double Number(JsonElement e,string n)=>e.TryGetProperty(n,out var x)&&x.ValueKind==JsonValueKind.Number?x.GetDouble():0;
     private static string String(JsonElement e,string n,string fallback)=>e.TryGetProperty(n,out var x)&&x.ValueKind==JsonValueKind.String?x.GetString()??fallback:fallback;
     private static double DoubleString(JsonElement e,string n)=>double.TryParse(String(e,n,""),out var v)?v:0;
@@ -78,7 +76,7 @@ public sealed class MarketDataProvider(IHttpClientFactory clients)
         }));
         var stocks = pages.SelectMany(x => x).ToList();
         var indices = await GetIndicesAsync(http, ct);
-        return new(DateTimeOffset.Now, indices, stocks.Count(x => x.ChangePercent > 0),
+        return new(ChinaTime.Now, indices, stocks.Count(x => x.ChangePercent > 0),
             stocks.Count(x => x.ChangePercent < 0), stocks.Count(x => x.ChangePercent == 0),
             stocks.Count(x => x.ChangePercent >= 9.8), stocks.Count(x => x.ChangePercent <= -9.8),
             stocks.OrderByDescending(x => x.ChangePercent).Take(5).ToArray(),

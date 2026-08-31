@@ -13,7 +13,7 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
     public async Task<ExecutionResult> ExecuteAsync(Guid templateId, Guid? deviceId, bool push, CancellationToken ct, Guid? ownerUserId=null, Guid? retryPolicyId=null)
     {
         var sw = Stopwatch.StartNew();
-        var template = await db.Templates.FirstOrDefaultAsync(x=>x.Id==templateId&&(x.OwnerUserId==null||x.OwnerUserId==ownerUserId),ct) ?? throw new KeyNotFoundException("模板不存在或无权访问。");
+        var template = await db.Templates.FirstOrDefaultAsync(x=>!x.IsDeleted&&x.Id==templateId&&(x.OwnerUserId==null||x.OwnerUserId==ownerUserId),ct) ?? throw new KeyNotFoundException("模板不存在或无权访问。");
         var policy=retryPolicyId.HasValue?await db.RetryPolicies.FirstOrDefaultAsync(x=>x.Id==retryPolicyId&&x.OwnerUserId==ownerUserId,ct):null;
         policy??=await db.RetryPolicies.FirstOrDefaultAsync(x=>x.OwnerUserId==ownerUserId&&x.IsDefault,ct);
         policy??=new RetryPolicyDefinition{Name="单次执行",OwnerUserId=ownerUserId??Guid.Empty,MaxAttempts=1,RetryPreview=false,RetryPush=false};
@@ -29,13 +29,14 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
             "server-status" => renderer.RenderSystem(await system.GetAsync(token)),
             "3xui-monitor" => renderer.RenderThreeXUi(await threeXUi.GetAsync(token)),
             "custom" => await RenderCustomAsync(template,token),
-            "designer" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",DateTimeOffset.Now),
-            "daily-quote" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",DateTimeOffset.Now),
+            "designer" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",ChinaTime.Now),
+            "daily-quote" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",ChinaTime.Now),
+            "employee-badge" => renderer.RenderDesigner(template.Name,template.SchemaJson??"{}",ChinaTime.Now),
             _ => throw new InvalidOperationException($"不支持的模板类型：{template.Type}")
         };
         var renderResult=policy.RetryPreview?await retry.RunAsync(Build,policy,"面板生成",ct):(await Build(ct),1);
         var rendered=renderResult.Item1;var attempts=renderResult.Item2;
-        var stamp = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
+        var stamp = ChinaTime.Now.ToString("yyyyMMdd-HHmmss");
         var root = Path.GetFullPath(Path.Combine(environment.ContentRootPath,
             configuration["Panel:OutputDirectory"] ?? "data/renders"));
         Directory.CreateDirectory(root);
@@ -73,8 +74,9 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
             "news-trending"=>renderer.RenderContent(await content.GetNewsAsync(false,ct)),
             "bilibili-hot"=>renderer.RenderContent(await content.GetBilibiliAsync(ct)),
             "ai-news"=>renderer.RenderContent(await content.GetNewsAsync(true,ct)),
-            "designer"=>renderer.RenderDesigner(name,schemaJson??"{}",DateTimeOffset.Now),
-            "daily-quote"=>renderer.RenderDesigner(name,schemaJson??"{}",DateTimeOffset.Now),
+            "designer"=>renderer.RenderDesigner(name,schemaJson??"{}",ChinaTime.Now),
+            "daily-quote"=>renderer.RenderDesigner(name,schemaJson??"{}",ChinaTime.Now),
+            "employee-badge"=>renderer.RenderDesigner(name,schemaJson??"{}",ChinaTime.Now),
             "custom"=>await RenderCustomAsync(template,ct),
             _=>throw new InvalidOperationException("该模板类型不支持代码预览。")
         };
@@ -93,7 +95,7 @@ public sealed class PanelExecutionService(AppDbContext db, MarketDataProvider ma
         if (JsonPath.Select(json.RootElement, schema.ItemsPath) is { ValueKind: JsonValueKind.Array } array)
             foreach (var item in array.EnumerateArray().Take(20))
                 rows.Add(schema.Columns.ToDictionary(x => x.Label, x => JsonPath.Read(item, x.Path) ?? "-"));
-        return renderer.RenderCustom(title, metrics, rows, DateTimeOffset.Now);
+        return renderer.RenderCustom(title, metrics, rows, ChinaTime.Now);
     }
 }
 public sealed record ExecutionResult(Guid RecordId, byte[] Bmp, byte[] Png, string PreviewPath, PushResult Push);

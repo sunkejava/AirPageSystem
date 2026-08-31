@@ -24,7 +24,7 @@ public sealed class PanelsController(PanelExecutionService executor,AppDbContext
  {
   var query=await db.PushRecords.AsNoTracking().VisibleToAsync(current,ct);var records=await query.ToListAsync(ct);
   var today=new DateTimeOffset(DateTime.UtcNow.Date,TimeSpan.Zero);
-  return Ok(new{devices=await db.Devices.CountAsync(x=>x.OwnerUserId==current.Id,ct),templates=await db.Templates.CountAsync(x=>x.OwnerUserId==null||x.OwnerUserId==current.Id,ct),schedules=await db.Schedules.CountAsync(x=>x.OwnerUserId==current.Id&&x.Enabled,ct),pushesToday=records.Count(x=>x.CreatedAt>=today),latest=records.OrderByDescending(x=>x.CreatedAt).Take(8)});
+  return Ok(new{devices=await db.Devices.CountAsync(x=>x.OwnerUserId==current.Id,ct),templates=await db.Templates.CountAsync(x=>!x.IsDeleted&&(x.OwnerUserId==null||x.OwnerUserId==current.Id),ct),schedules=await db.Schedules.CountAsync(x=>x.OwnerUserId==current.Id&&x.Enabled,ct),pushesToday=records.Count(x=>x.CreatedAt>=today),latest=records.OrderByDescending(x=>x.CreatedAt).Take(8)});
  }
  [HttpGet("renders/{file}")] public IActionResult Render(string file)
  {

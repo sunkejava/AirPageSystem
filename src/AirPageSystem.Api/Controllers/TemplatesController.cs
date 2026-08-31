@@ -11,7 +11,7 @@ public sealed class TemplatesController(AppDbContext db,CurrentUser current) : C
 {
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct)
     {
-        var items=await db.Templates.Where(x=>x.OwnerUserId==null||x.OwnerUserId==current.Id).OrderBy(x=>x.Name).ToListAsync(ct);
+        var items=await db.Templates.Where(x=>!x.IsDeleted&&(x.OwnerUserId==null||x.OwnerUserId==current.Id)).OrderBy(x=>x.Name).ToListAsync(ct);
         var personalTypes=items.Where(x=>x.OwnerUserId==current.Id&&x.Type is ("stock-watch" or "fund-watch" or "weather-environment")).Select(x=>x.Type).ToHashSet();
         return Ok(items.Where(x=>!(x.OwnerUserId is null&&personalTypes.Contains(x.Type))));
     }
@@ -23,7 +23,7 @@ public sealed class TemplatesController(AppDbContext db,CurrentUser current) : C
     }
     [HttpPut("{id:guid}")] public async Task<IActionResult> Update(Guid id, SaveTemplateRequest r, CancellationToken ct)
     {
-        await current.DemandAsync("templates.manage",ct);var item=await db.Templates.FirstOrDefaultAsync(x=>x.Id==id&&(x.OwnerUserId==current.Id||x.OwnerUserId==null),ct); if(item is null)return NotFound();
+        await current.DemandAsync("templates.manage",ct);var item=await db.Templates.FirstOrDefaultAsync(x=>!x.IsDeleted&&x.Id==id&&(x.OwnerUserId==current.Id||x.OwnerUserId==null),ct); if(item is null)return NotFound();
         if(item.IsBuiltIn&&item.Type is ("stock-watch" or "fund-watch" or "weather-environment"))
         {
             var personal=await db.Templates.FirstOrDefaultAsync(x=>x.OwnerUserId==current.Id&&x.Type==item.Type,ct);
@@ -35,13 +35,13 @@ public sealed class TemplatesController(AppDbContext db,CurrentUser current) : C
         if(!item.IsBuiltIn&&r.DataSourceId.HasValue&&!await db.DataSources.AnyAsync(x=>x.Id==r.DataSourceId&&x.OwnerUserId==current.Id,ct))return BadRequest("数据源不存在或无权访问。");
         item.Name=r.Name;item.Description=r.Description??"";
         if(!item.IsBuiltIn){item.Type=r.Type;item.DataSourceId=r.DataSourceId;item.SchemaJson=r.SchemaJson;}
-        else if(item.Type is "designer" or "daily-quote")item.SchemaJson=r.SchemaJson;
+        else if(item.Type is "designer" or "daily-quote" or "employee-badge")item.SchemaJson=r.SchemaJson;
         item.UpdatedAt=DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);return Ok(item);
     }
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Delete(Guid id,CancellationToken ct)
     {
-        await current.DemandAsync("templates.manage",ct);var item=await db.Templates.FirstOrDefaultAsync(x=>x.Id==id&&x.OwnerUserId==current.Id,ct);if(item is null)return NotFound();if(item.IsBuiltIn)return Conflict("内置模板不可删除。");
-        db.Remove(item);await db.SaveChangesAsync(ct);return NoContent();
+        await current.DemandAsync("templates.manage",ct);var item=await db.Templates.FirstOrDefaultAsync(x=>!x.IsDeleted&&x.Id==id&&(x.OwnerUserId==current.Id||x.OwnerUserId==null),ct);if(item is null)return NotFound();if(item.IsBuiltIn&&!current.IsAdmin)return Forbid();
+        if(item.IsBuiltIn){item.IsDeleted=true;item.UpdatedAt=DateTimeOffset.UtcNow;}else db.Remove(item);await db.Schedules.Where(x=>x.TemplateId==id).ExecuteDeleteAsync(ct);await db.SaveChangesAsync(ct);return NoContent();
     }
 }

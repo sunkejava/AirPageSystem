@@ -40,7 +40,7 @@ public sealed class ThreeXUiMonitorProvider(IConfiguration configuration, ILogge
                 udp,
                 LocalAddresses(),
                 database.Inbounds,
-                DateTimeOffset.Now,
+                ChinaTime.Now,
                 dbPath is null ? "未找到3x-ui数据库" : panelProcesses.Length==0&&databaseAvailable?database.Status+"｜进程状态由数据库推断":database.Status);
         }
         finally

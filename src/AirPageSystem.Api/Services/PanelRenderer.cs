@@ -177,11 +177,13 @@ public sealed class PanelRenderer(IConfiguration config)
     }
     private void DrawBadge(Image<L8> c,JsonElement root,string title)
     {
-        c.Mutate(x=>x.Fill(Color.Black,new Rectangle(0,0,_width,130)));Center(c,Value(root,"company",title),_width/2,35,30,Color.White);
-        Box(c,40,170,140,180);Center(c,Value(root,"photo","PHOTO"),110,245,18);Text(c,Value(root,"name","姓名"),215,188,42,true);
-        Text(c,Value(root,"role","职位 / ROLE"),218,248,22);Text(c,"编号  "+Value(root,"id","AP-0001"),218,300,18);
-        c.Mutate(x=>x.Draw(Color.Black,4,new Rectangle(35,390,458,250)));Center(c,Value(root,"department","部门 / DEPARTMENT"),264,430,20);
-        Center(c,Value(root,"message","专业 · 可靠 · 高效"),264,510,30);Footer(c,Value(root,"footer","请佩戴工牌进入工作区域"),"AirPage 电子工牌");
+        c.Mutate(x=>x.Fill(Color.Black,new Rectangle(0,0,_width,120)));Center(c,Trim(Value(root,"company",title),22),_width/2,22,30,Color.White);Center(c,Trim(Value(root,"companyEn","IDENTITY CARD"),36),_width/2,66,15,Color.ParseHex("DDDDDD"));
+        var avatar=Value(root,"avatar","");if(string.IsNullOrWhiteSpace(avatar)){Box(c,28,150,166,205);Center(c,"PHOTO",111,238,18);}else DrawDataImage(c,avatar,28,150,166,205,ResizeMode.Crop);
+        Text(c,Trim(Value(root,"name","姓名"),8),222,157,40,true);Text(c,Trim(Value(root,"nameEn","NAME"),18),224,207,14,false,Color.ParseHex("666666"));
+        Text(c,Trim(Value(root,"role","职位 / ROLE"),18),222,239,22,true);Text(c,"编号  "+Trim(Value(root,"id","AP-0001"),16),222,282,17);Text(c,"部门  "+Trim(Value(root,"department","研发中心"),16),222,316,17);
+        c.Mutate(x=>x.Fill(Color.ParseHex("E8E8E8"),new Rectangle(22,385,484,2)));Text(c,"联系方式",28,408,21,true);Text(c,"电话  "+Trim(Value(root,"phone","138 0000 0000"),24),32,452,17);Text(c,"邮箱  "+Trim(Value(root,"email","name@example.com"),28),32,486,17);Text(c,"地点  "+Trim(Value(root,"location","中国 · 上海"),24),32,520,17);
+        c.Mutate(x=>x.Draw(Color.Black,3,new Rectangle(25,570,478,105)));Center(c,Trim(Value(root,"message","专业 · 可靠 · 高效"),22),264,590,26);Center(c,"VALID THRU  "+Value(root,"validUntil","长期有效"),264,638,15);
+        Footer(c,Value(root,"footer","请佩戴工牌进入工作区域"),"AirPage 电子工牌｜信息由持有人维护");
     }
     private void DrawBoardingPass(Image<L8> c,JsonElement root,DateTimeOffset at)
     {
@@ -206,8 +208,11 @@ public sealed class PanelRenderer(IConfiguration config)
     }
     private void DrawEmbeddedImage(Image<L8> canvas,JsonElement element,int x,int y,int width,int height)
     {
-        var data=Value(element,"data","");var comma=data.IndexOf(',');if(comma<0||!data.StartsWith("data:image/",StringComparison.OrdinalIgnoreCase))return;
-        var encoded=data[(comma+1)..];if(encoded.Length>3_000_000)return;try{var bytes=Convert.FromBase64String(encoded);using var image=Image.Load<L8>(bytes);image.Mutate(v=>v.Resize(new ResizeOptions{Size=new Size(width,height),Mode=ResizeMode.Max}));canvas.Mutate(v=>v.DrawImage(image,new Point(x,y),1));}catch{}
+        DrawDataImage(canvas,Value(element,"data",""),x,y,width,height,ResizeMode.Max);
+    }
+    private static void DrawDataImage(Image<L8> canvas,string data,int x,int y,int width,int height,ResizeMode mode)
+    {
+        var comma=data.IndexOf(',');if(comma<0||!data.StartsWith("data:image/",StringComparison.OrdinalIgnoreCase))return;var encoded=data[(comma+1)..];if(encoded.Length>3_000_000)return;try{var bytes=Convert.FromBase64String(encoded);using var image=Image.Load<L8>(bytes);image.Mutate(v=>v.Resize(new ResizeOptions{Size=new Size(width,height),Mode=mode}));canvas.Mutate(v=>v.DrawImage(image,new Point(x,y),1));}catch{}
     }
     private void DrawWrapped(Image<L8> c,string value,int x,int y,int width,int size,int lineHeight,bool bold=false)
     {
@@ -235,6 +240,7 @@ public sealed class PanelRenderer(IConfiguration config)
     }
     private void Header(Image<L8> c, string title, DateTimeOffset at, string snapshot = "状态快照")
     {
+        at=ChinaTime.Convert(at);
         c.Mutate(x => x.Fill(Color.Black, new Rectangle(0, 0, _width, 82)));
         Text(c, title, 18, 10, 34, true, Color.White);
         Text(c, $"{at:yyyy-MM-dd HH:mm:ss} 北京时间｜{snapshot}", 18, 56, 14, false, Color.ParseHex("DDDDDD"));

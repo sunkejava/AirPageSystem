@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS "RetryPolicies" ("Id" TEXT NOT NULL CONSTRAINT "PK_Re
         {
             ("Devices","OwnerUserId","TEXT NULL"),("Templates","OwnerUserId","TEXT NULL"),
             ("DataSources","OwnerUserId","TEXT NULL"),("Schedules","OwnerUserId","TEXT NULL"),("Schedules","RetryPolicyId","TEXT NULL"),
-            ("PushRecords","OwnerUserId","TEXT NULL"),("PushRecords","AttemptCount","INTEGER NOT NULL DEFAULT 1")
+            ("PushRecords","OwnerUserId","TEXT NULL"),("PushRecords","AttemptCount","INTEGER NOT NULL DEFAULT 1"),
+            ("Templates","IsDeleted","INTEGER NOT NULL DEFAULT 0")
         })
         {
             var exists = await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*) AS Value FROM pragma_table_info('{table}') WHERE name='{column}'").SingleAsync() > 0;

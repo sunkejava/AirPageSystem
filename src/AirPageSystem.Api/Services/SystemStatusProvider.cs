@@ -29,7 +29,7 @@ public sealed class SystemStatusProvider
         await Task.Yield();
         return new(Environment.MachineName, RuntimeInformation.OSDescription, DateTimeOffset.UtcNow - _started,
             GC.GetGCMemoryInfo().TotalAvailableMemoryBytes, GC.GetTotalMemory(false), process.WorkingSet64,
-            drives.Sum(x => x.TotalSize), drives.Sum(x => x.TotalFreeSpace), rx, tx, deltaRx, deltaTx, top, DateTimeOffset.Now);
+            drives.Sum(x => x.TotalSize), drives.Sum(x => x.TotalFreeSpace), rx, tx, deltaRx, deltaTx, top, ChinaTime.Now);
     }
 }
 public sealed record SystemStatusSnapshot(string Host, string OS, TimeSpan Uptime, long AvailableMemoryBytes,

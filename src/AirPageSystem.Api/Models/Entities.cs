@@ -25,6 +25,7 @@ public sealed class PanelTemplate
     public string? SchemaJson { get; set; }
     public Guid? DataSourceId { get; set; }
     public bool IsBuiltIn { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public Guid? OwnerUserId { get; set; }
 }
